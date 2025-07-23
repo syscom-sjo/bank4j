@@ -1,22 +1,53 @@
 package io.inisos.bank4j.impl;
 
-import io.inisos.bank4j.*;
-import iso.std.iso._20022.tech.xsd.pain_001_001.*;
-import jakarta.xml.bind.JAXBContext;
-import jakarta.xml.bind.JAXBElement;
-import jakarta.xml.bind.JAXBException;
-import jakarta.xml.bind.Marshaller;
-import org.iban4j.BicUtil;
-import org.iban4j.IbanUtil;
-
-import javax.xml.datatype.DatatypeConfigurationException;
-import javax.xml.datatype.DatatypeFactory;
-import javax.xml.namespace.QName;
 import java.io.Writer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.StringJoiner;
+
+import javax.xml.datatype.DatatypeConfigurationException;
+import javax.xml.datatype.DatatypeFactory;
+import javax.xml.namespace.QName;
+
+import org.iban4j.BicUtil;
+import org.iban4j.IbanUtil;
+
+import io.inisos.bank4j.BankAccount;
+import io.inisos.bank4j.CreditTransferOperation;
+import io.inisos.bank4j.Party;
+import io.inisos.bank4j.PostalAddress;
+import io.inisos.bank4j.Transaction;
+import iso.std.iso._20022.tech.xsd.pain_001_001.AccountIdentification4Choice;
+import iso.std.iso._20022.tech.xsd.pain_001_001.ActiveOrHistoricCurrencyAndAmount;
+import iso.std.iso._20022.tech.xsd.pain_001_001.AddressType2Code;
+import iso.std.iso._20022.tech.xsd.pain_001_001.AmountType3Choice;
+import iso.std.iso._20022.tech.xsd.pain_001_001.BranchAndFinancialInstitutionIdentification4;
+import iso.std.iso._20022.tech.xsd.pain_001_001.CashAccount16;
+import iso.std.iso._20022.tech.xsd.pain_001_001.ChargeBearerType1Code;
+import iso.std.iso._20022.tech.xsd.pain_001_001.CreditTransferTransactionInformation10;
+import iso.std.iso._20022.tech.xsd.pain_001_001.CustomerCreditTransferInitiationV03;
+import iso.std.iso._20022.tech.xsd.pain_001_001.Document;
+import iso.std.iso._20022.tech.xsd.pain_001_001.FinancialInstitutionIdentification7;
+import iso.std.iso._20022.tech.xsd.pain_001_001.GenericAccountIdentification1;
+import iso.std.iso._20022.tech.xsd.pain_001_001.GroupHeader32;
+import iso.std.iso._20022.tech.xsd.pain_001_001.ObjectFactory;
+import iso.std.iso._20022.tech.xsd.pain_001_001.PartyIdentification32;
+import iso.std.iso._20022.tech.xsd.pain_001_001.PaymentIdentification1;
+import iso.std.iso._20022.tech.xsd.pain_001_001.PaymentInstructionInformation3;
+import iso.std.iso._20022.tech.xsd.pain_001_001.PaymentMethod3Code;
+import iso.std.iso._20022.tech.xsd.pain_001_001.PaymentTypeInformation19;
+import iso.std.iso._20022.tech.xsd.pain_001_001.PostalAddress6;
+import iso.std.iso._20022.tech.xsd.pain_001_001.RemittanceInformation5;
+import iso.std.iso._20022.tech.xsd.pain_001_001.ServiceLevel8Choice;
+import jakarta.xml.bind.JAXBContext;
+import jakarta.xml.bind.JAXBElement;
+import jakarta.xml.bind.JAXBException;
+import jakarta.xml.bind.Marshaller;
 
 /**
  * A JAXB ISO 20022 Credit Transfer with PAIN.001.001.03
@@ -35,6 +66,7 @@ public class JAXBCreditTransfer implements CreditTransferOperation {
     private final LocalDateTime creationDateTime;
     private final LocalDate requestedExecutionDate;
     private final ChargeBearerType1Code chargeBearerCode;
+    private final Boolean batchBooking;
 
     private final DatatypeFactory datatypeFactory;
 
@@ -51,8 +83,9 @@ public class JAXBCreditTransfer implements CreditTransferOperation {
      * @param creationDateTime       optional message creation date and time, defaults to now
      * @param requestedExecutionDate optional requested execution date and time, defaults to tomorrow
      * @param chargeBearerCode       optional charge bearer code defines who is bearing the charges of the transfer, by default it is set to 'SLEV' (Service Level)
+     * @param batchBooking           optional batch booking, defaults to false
      */
-    public JAXBCreditTransfer(String serviceLevelCode, Party debtor, BankAccount debtorAccount, Collection<Transaction> transactions, String id, LocalDateTime creationDateTime, LocalDate requestedExecutionDate, ChargeBearerType1Code chargeBearerCode) {
+    public JAXBCreditTransfer(String serviceLevelCode, Party debtor, BankAccount debtorAccount, Collection<Transaction> transactions, String id, LocalDateTime creationDateTime, LocalDate requestedExecutionDate, ChargeBearerType1Code chargeBearerCode, Boolean batchBooking) {
         this.serviceLevelCode = serviceLevelCode;
         this.debtor = debtor;
         this.debtorAccount = Objects.requireNonNull(debtorAccount, "Debtor account cannot be null");
@@ -61,6 +94,7 @@ public class JAXBCreditTransfer implements CreditTransferOperation {
         this.requestedExecutionDate = Optional.ofNullable(requestedExecutionDate).orElse(LocalDate.now().plusDays(1));
         this.id = Optional.ofNullable(id).orElseGet(() -> FORMAT_AS_ID.format(this.creationDateTime));
         this.chargeBearerCode = Optional.ofNullable(chargeBearerCode).orElseGet(() -> ChargeBearerType1Code.SLEV);
+        this.batchBooking = Optional.ofNullable(batchBooking).orElse(false);
 
         try {
             this.datatypeFactory = DatatypeFactory.newInstance();
@@ -111,7 +145,7 @@ public class JAXBCreditTransfer implements CreditTransferOperation {
         PaymentInstructionInformation3 paymentInstructionInformationSCT3 = new PaymentInstructionInformation3();
         paymentInstructionInformationSCT3.setPmtInfId(this.id);
         paymentInstructionInformationSCT3.setPmtMtd(PaymentMethod3Code.TRF);
-        paymentInstructionInformationSCT3.setBtchBookg(false);
+        paymentInstructionInformationSCT3.setBtchBookg(this.batchBooking);
         paymentInstructionInformationSCT3.setNbOfTxs(String.valueOf(this.transactions.size()));
         paymentInstructionInformationSCT3.setCtrlSum(this.getTotalAmount());
         paymentInstructionInformationSCT3.setDbtr(partyIdentification(this.debtor));
@@ -297,6 +331,10 @@ public class JAXBCreditTransfer implements CreditTransferOperation {
     }
 
     @Override
+    public boolean isBatchBooking() {
+        return batchBooking;
+    }
+    @Override
     public Collection<Transaction> getTransactions() {
         return transactions;
     }
@@ -313,7 +351,7 @@ public class JAXBCreditTransfer implements CreditTransferOperation {
         if (this == o) return true;
         if (!(o instanceof JAXBCreditTransfer)) return false;
         JAXBCreditTransfer that = (JAXBCreditTransfer) o;
-        return serviceLevelCode.equals(that.serviceLevelCode) && debtor.equals(that.debtor) && getTransactions().equals(that.getTransactions()) && id.equals(that.id) && creationDateTime.equals(that.creationDateTime) && requestedExecutionDate.equals(that.requestedExecutionDate);
+        return serviceLevelCode.equals(that.serviceLevelCode) && debtor.equals(that.debtor) && getTransactions().equals(that.getTransactions()) && id.equals(that.id) && creationDateTime.equals(that.creationDateTime) && requestedExecutionDate.equals(that.requestedExecutionDate) && chargeBearerCode == that.chargeBearerCode && batchBooking.equals(that.batchBooking);
     }
 
     @Override
@@ -329,6 +367,7 @@ public class JAXBCreditTransfer implements CreditTransferOperation {
                 .add("id='" + id + "'")
                 .add("creationDateTime=" + creationDateTime)
                 .add("requestedExecutionDate=" + requestedExecutionDate)
+                .add("batchBooking=" + batchBooking)
                 .toString();
     }
 }

@@ -21,6 +21,8 @@ public interface CreditTransfer {
 
     LocalDate getRequestedExecutionDate();
 
+    boolean isBatchBooking();
+
     Collection<Transaction> getTransactions();
 
     default BigDecimal getTotalAmount() {

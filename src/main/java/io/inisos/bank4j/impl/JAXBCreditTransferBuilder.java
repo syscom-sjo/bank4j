@@ -1,12 +1,16 @@
 package io.inisos.bank4j.impl;
 
-import io.inisos.bank4j.*;
-import iso.std.iso._20022.tech.xsd.pain_001_001.ChargeBearerType1Code;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+
+import io.inisos.bank4j.BankAccount;
+import io.inisos.bank4j.CreditTransferOperation;
+import io.inisos.bank4j.CreditTransferOperationBuilder;
+import io.inisos.bank4j.Party;
+import io.inisos.bank4j.Transaction;
+import iso.std.iso._20022.tech.xsd.pain_001_001.ChargeBearerType1Code;
 
 public class JAXBCreditTransferBuilder implements CreditTransferOperationBuilder {
     private String serviceLevelCode;
@@ -17,6 +21,7 @@ public class JAXBCreditTransferBuilder implements CreditTransferOperationBuilder
     private LocalDateTime creationDateTime;
     private LocalDate requestedExecutionDate;
     private ChargeBearerType1Code chargeBearerCode;
+    private Boolean batchBooking;
 
     @Override
     public CreditTransferOperationBuilder serviceLevelCode(String serviceLevelCode) {
@@ -73,7 +78,13 @@ public class JAXBCreditTransferBuilder implements CreditTransferOperationBuilder
     }
 
     @Override
+    public CreditTransferOperationBuilder batchBooking(Boolean batchBooking) {
+        this.batchBooking = batchBooking;
+        return this;
+    }
+
+    @Override
     public CreditTransferOperation build() {
-        return new JAXBCreditTransfer(serviceLevelCode, debtor, debtorAccount, transactions, id, creationDateTime, requestedExecutionDate, chargeBearerCode);
+        return new JAXBCreditTransfer(serviceLevelCode, debtor, debtorAccount, transactions, id, creationDateTime, requestedExecutionDate, chargeBearerCode, batchBooking);
     }
 }
