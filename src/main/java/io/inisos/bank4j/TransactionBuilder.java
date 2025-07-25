@@ -49,5 +49,7 @@ public interface TransactionBuilder {
 
     TransactionBuilder remittanceInformationUnstructured(Set<String> remittanceInformationUnstructured);
 
+    TransactionBuilder remittanceInformationStructured(Set<CreditorReferenceInformation> remittanceInformationStructured);
+
     Transaction build();
 }

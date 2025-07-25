@@ -19,9 +19,11 @@ import org.iban4j.IbanUtil;
 
 import io.inisos.bank4j.BankAccount;
 import io.inisos.bank4j.CreditTransferOperation;
+import io.inisos.bank4j.CreditorReferenceInformation;
 import io.inisos.bank4j.Party;
 import io.inisos.bank4j.PostalAddress;
 import io.inisos.bank4j.Transaction;
+import io.inisos.bank4j.util.CreditorReferenceInformationValidator;
 import iso.std.iso._20022.tech.xsd.pain_001_001.AccountIdentification4Choice;
 import iso.std.iso._20022.tech.xsd.pain_001_001.ActiveOrHistoricCurrencyAndAmount;
 import iso.std.iso._20022.tech.xsd.pain_001_001.AddressType2Code;
@@ -30,6 +32,9 @@ import iso.std.iso._20022.tech.xsd.pain_001_001.BranchAndFinancialInstitutionIde
 import iso.std.iso._20022.tech.xsd.pain_001_001.CashAccount16;
 import iso.std.iso._20022.tech.xsd.pain_001_001.ChargeBearerType1Code;
 import iso.std.iso._20022.tech.xsd.pain_001_001.CreditTransferTransactionInformation10;
+import iso.std.iso._20022.tech.xsd.pain_001_001.CreditorReferenceInformation2;
+import iso.std.iso._20022.tech.xsd.pain_001_001.CreditorReferenceType1Choice;
+import iso.std.iso._20022.tech.xsd.pain_001_001.CreditorReferenceType2;
 import iso.std.iso._20022.tech.xsd.pain_001_001.CustomerCreditTransferInitiationV03;
 import iso.std.iso._20022.tech.xsd.pain_001_001.Document;
 import iso.std.iso._20022.tech.xsd.pain_001_001.FinancialInstitutionIdentification7;
@@ -44,6 +49,7 @@ import iso.std.iso._20022.tech.xsd.pain_001_001.PaymentTypeInformation19;
 import iso.std.iso._20022.tech.xsd.pain_001_001.PostalAddress6;
 import iso.std.iso._20022.tech.xsd.pain_001_001.RemittanceInformation5;
 import iso.std.iso._20022.tech.xsd.pain_001_001.ServiceLevel8Choice;
+import iso.std.iso._20022.tech.xsd.pain_001_001.StructuredRemittanceInformation7;
 import jakarta.xml.bind.JAXBContext;
 import jakarta.xml.bind.JAXBElement;
 import jakarta.xml.bind.JAXBException;
@@ -85,6 +91,7 @@ public class JAXBCreditTransfer implements CreditTransferOperation {
      * @param chargeBearerCode       optional charge bearer code defines who is bearing the charges of the transfer, by default it is set to 'SLEV' (Service Level)
      * @param batchBooking           optional batch booking, defaults to false
      */
+    @SuppressWarnings("java:S107")
     public JAXBCreditTransfer(String serviceLevelCode, Party debtor, BankAccount debtorAccount, Collection<Transaction> transactions, String id, LocalDateTime creationDateTime, LocalDate requestedExecutionDate, ChargeBearerType1Code chargeBearerCode, Boolean batchBooking) {
         this.serviceLevelCode = serviceLevelCode;
         this.debtor = debtor;
@@ -205,9 +212,19 @@ public class JAXBCreditTransfer implements CreditTransferOperation {
         creditTransferTransactionInformation.setCdtrAcct(cashAccount(transaction.getAccount()));
 
         // remittance information
-        if (transaction.getRemittanceInformationUnstructured().size() > 0) {
+        if (!transaction.getRemittanceInformationUnstructured().isEmpty() || !transaction.getRemittanceInformationStructured().isEmpty()) {
             RemittanceInformation5 remittanceInformation = new RemittanceInformation5();
-            remittanceInformation.getUstrd().addAll(transaction.getRemittanceInformationUnstructured());
+            // unstructured remittance information
+            if (!transaction.getRemittanceInformationUnstructured().isEmpty()) {
+                remittanceInformation.getUstrd().addAll(transaction.getRemittanceInformationUnstructured());
+            }
+            // structured remittance information
+            if(!transaction.getRemittanceInformationStructured().isEmpty()) {
+                remittanceInformation.getStrd().addAll(transaction.getRemittanceInformationStructured()
+                        .stream()
+                        .map(this::structuredRemittanceInformation)
+                        .toList());
+            }
             creditTransferTransactionInformation.setRmtInf(remittanceInformation);
         }
 
@@ -303,6 +320,25 @@ public class JAXBCreditTransfer implements CreditTransferOperation {
             throw new IllegalArgumentException("IBAN or otherId must be provided");
         }
         return accountIdentification;
+    }
+
+    private StructuredRemittanceInformation7 structuredRemittanceInformation(CreditorReferenceInformation creditorReferenceInformation) {
+        CreditorReferenceInformationValidator.validate(creditorReferenceInformation);
+
+        CreditorReferenceType1Choice cdOrPrtry = new CreditorReferenceType1Choice();
+        cdOrPrtry.setCd(creditorReferenceInformation.getCode());
+
+        CreditorReferenceType2 creditorReferenceType = new CreditorReferenceType2();
+        creditorReferenceType.setCdOrPrtry(cdOrPrtry);
+        creditorReferenceType.setIssr(creditorReferenceInformation.getIssuer());
+
+        CreditorReferenceInformation2 cdtrRefInf = new CreditorReferenceInformation2();
+        cdtrRefInf.setTp(creditorReferenceType);
+        cdtrRefInf.setRef(creditorReferenceInformation.getRef());
+
+        StructuredRemittanceInformation7 structuredRemittanceInformation = new StructuredRemittanceInformation7();
+        structuredRemittanceInformation.setCdtrRefInf(cdtrRefInf);
+        return structuredRemittanceInformation;
     }
 
     @Override

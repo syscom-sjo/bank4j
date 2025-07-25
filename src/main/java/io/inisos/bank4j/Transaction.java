@@ -56,4 +56,9 @@ public interface Transaction {
      * @return unstructured remittance information
      */
     Set<String> getRemittanceInformationUnstructured();
+
+    /**
+     * @return structured remittance information
+     */
+    Set<CreditorReferenceInformation> getRemittanceInformationStructured();
 }

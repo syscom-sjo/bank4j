@@ -1,6 +1,11 @@
 package io.inisos.bank4j;
 
-import io.inisos.bank4j.impl.*;
+import io.inisos.bank4j.impl.JAXBCreditTransferBuilder;
+import io.inisos.bank4j.impl.SimpleBankAccountBuilder;
+import io.inisos.bank4j.impl.SimpleCreditorReferenceInformationBuilder;
+import io.inisos.bank4j.impl.SimplePartyBuilder;
+import io.inisos.bank4j.impl.SimplePostalAddressBuilder;
+import io.inisos.bank4j.impl.SimpleTransactionBuilder;
 
 /**
  * Builder Factory
@@ -29,6 +34,10 @@ public class Bank {
 
     public static CreditTransferOperationBuilder jaxbCreditTransfer() {
         return new JAXBCreditTransferBuilder();
+    }
+
+    public static CreditorReferenceInformationBuilder simpleCreditorReferenceInformation() {
+        return new SimpleCreditorReferenceInformationBuilder();
     }
 
     private Bank() {
